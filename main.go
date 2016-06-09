@@ -9,13 +9,23 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
-var ConcurrentResolvers = 32
-var ConcurrentGetters = 16
-
 func main() {
+	concurrentResolversStr := os.Getenv("CONCURRENT_RESOLVERS")
+	concurrentGettersStr := os.Getenv("CONCURRENT_GETTERS")
+
+	concurrentResolvers, err := strconv.Atoi(concurrentResolversStr)
+	if err != nil {
+		fmt.Println("No CONCURRENT_RESOLVERS set, defaulting to 0")
+	}
+	concurrentGetters, err := strconv.Atoi(concurrentGettersStr)
+	if err != nil {
+		fmt.Println("No CONCURRENT_GETTERS set, defaulting to 0")
+	}
+
 	domains := make(chan string, 1000)
 	// Filter this out in to another chan. We never want to slow down
 	// the DNS lookups for http requests, so we can just drop if this
@@ -27,7 +37,7 @@ func main() {
 	}()
 
 	// The resolvers
-	for i := 0; i < ConcurrentResolvers; i++ {
+	for i := 0; i < concurrentResolvers; i++ {
 		go func() {
 			for domain := range domains {
 				_, err := net.ResolveIPAddr("ip4", domain)
@@ -45,7 +55,7 @@ func main() {
 	}
 
 	// The resolvers
-	for i := 0; i < ConcurrentGetters; i++ {
+	for i := 0; i < concurrentGetters; i++ {
 		go func() {
 			for domain := range getHosts {
 				resp, err := http.Get("http://" + domain)
